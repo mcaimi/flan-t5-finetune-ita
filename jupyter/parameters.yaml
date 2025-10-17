@@ -2,3 +2,7 @@ huggingface:
   apitoken: "your_api_token"
   local_dir: "/tmp/cache/huggingface/local_repo"
   cache_dir: "/tmp/cache/huggingface"
+
+wandb:
+  apitoken: "your_api_token"
+  project: "wandb_project_name"
