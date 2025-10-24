@@ -14,9 +14,10 @@ This project provides a complete Jupyter notebook for fine-tuning Google's FLAN-
 - ✅ Complete training pipeline
 - ✅ Synthetic Italian PII dataset with 30+ examples
 - ✅ Text-to-text anonymization format
-- ✅ Training and evaluation
-- ✅ Inference examples
-- ✅ Model saving and loading
+- ✅ Training notebook
+- ✅ Inference examples in notebook
+- ✅ ONNX Conversion Notebook and Inference Test
+- ✅ Example Kubeflow Pipeline for training
 - ✅ GPU support (automatically detected)
 
 ## PII Types Supported
@@ -131,6 +132,56 @@ model_name = "google/flan-t5-large"  # 780M parameters
 ```
 
 Note: Larger models require more memory and training time.
+
+### Required S3 Connections and Kubernetes Secrets
+
+The notebooks and pipelines use secrets to connect to S3 storage and Hugging Face Repositories.
+
+You need to create these secrets in the Kubernetes Project you run all experiments:
+
+1. An Hugging Face Token Secret:
+
+```bash
+$ oc create secret generic huggingface-secret --from-literal=HF_TOKEN=hf_api_token --from-literal=HF_HOME=hf_home_path
+```
+
+2. A secret holding the API Token to interface with Weights and Biases (optional)
+
+```bash
+$ oc create secret generic wandb-secret --from-literal=WB_APITOKEN=wandb-token --from-literal=WB_PROJECTNAME=project-name
+```
+
+Additionally, on OCP AI you need to create connections for interacting with S3 Storage Buckets. For example, for the `s3-artifacts` connection you need to deploy a manifest like this:
+
+```yaml
+kind: Secret
+apiVersion: v1
+metadata:
+  name: s3-artifacts
+  namespace: flan-t5-finetune
+  labels:
+    opendatahub.io/dashboard: 'true'
+    opendatahub.io/managed: 'true'
+  annotations:
+    opendatahub.io/connection-type: s3
+    opendatahub.io/connection-type-ref: s3
+    openshift.io/description: ''
+    openshift.io/display-name: s3-artifacts
+data:
+  AWS_ACCESS_KEY_ID: <ACCESS_KEY_BASE64>
+  AWS_DEFAULT_REGION: <REGION_BASE64>
+  AWS_S3_BUCKET: <BUCKET_NAME_BASE64>
+  AWS_S3_ENDPOINT: <S3_API_ENDPOINT_BASE64>
+  AWS_SECRET_ACCESS_KEY: <SECRET_KEY_BASE64>
+type: Opaque
+```
+
+The required secrets (and corresponding buckets on S3) are:
+
+- `s3-artifacts`: for storing artifacts during training/experimenting
+- `s3-models`: for storing model checkpoints
+- `s3-pipelines`: for storing data used by kubeflow
+- `s3-datasets`: for storing datasets
 
 ## References
 
