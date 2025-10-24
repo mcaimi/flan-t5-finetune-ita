@@ -1,4 +1,4 @@
-PARAMETER_FILE = "parameters.yaml.local"
+PARAMETER_FILE = "config.local/parameters.yaml.local"
 MODEL_REPO_ID = "google/flan-t5-small"
 DATASET_FILE = "../dataset"
 OUTPUT_DIR = "flan-finetuned-ita"
