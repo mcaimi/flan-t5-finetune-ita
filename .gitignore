@@ -8,6 +8,7 @@ wheels/
 **/flan-finetuned-ita/*
 *.local
 **/wandb
+**/.DS_Store
 
 # Virtual environments
 .venv
