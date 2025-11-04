@@ -61,20 +61,19 @@ class DataPreprocessor():
         
         # Tokenize inputs
         model_inputs = self.tokenizer(
-            inputs,
+            text=inputs,
             max_length=max_length,  # Increased for longer Italian sentences
             truncation=truncation,
             padding=padding
         )
         
         # Tokenize targets
-        with self.tokenizer.as_target_tokenizer():
-            labels = self.tokenizer(
-                targets,
-                max_length=max_length,
-                truncation=truncation,
-                padding=padding
-            )
+        labels = self.tokenizer(
+            text_target=targets,
+            max_length=max_length,
+            truncation=truncation,
+            padding=padding
+        )
         
         # Replace padding token id in labels with -100 (ignored by loss)
         label_ids = [tok if tok != self.tokenizer.pad_token_id else -100 for tok in labels.get('input_ids')]
