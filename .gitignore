@@ -6,6 +6,7 @@ dist/
 wheels/
 *.egg-info
 **/flan-finetuned-ita/*
+**/flan-finetuned-ita-onnx/*
 *.local
 **/wandb
 **/.DS_Store
