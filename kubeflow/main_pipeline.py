@@ -14,6 +14,7 @@ from fetch_model import fetch_model
 from persistent_data import unzip_data
 from train_model import train_model
 from convert_model import convert_model
+from upload_model import push_to_model_registry
 
 # Pipeline definition
 
@@ -39,6 +40,7 @@ def training_pipeline(
     dataset_file_name: str,
     pipeline_version: str,
     author_name: str,
+    registry: str,
     cluster_domain: str,
     dataset_path: str,
     model_path: str,
@@ -124,6 +126,35 @@ def training_pipeline(
         mount_path="/data",
     )
 
+    # push to model registry
+    push_task = push_to_model_registry(model_name=model_name,
+                                       finetuned_model=train_model_task.outputs["finetuned_model"],
+                                       version=dataset_version,
+                                       registry=registry,
+                                       cluster_domain=cluster_domain,
+                                       author_name=author_name,
+                                       data_path=finetuned_model_path)
+    push_task.after(train_model_task)
+    push_task.after(convert_task)
+    kubernetes.use_secret_as_env(
+        push_task,
+        secret_name=data_connection_secret_name,
+        secret_key_to_env={
+            "AWS_S3_ENDPOINT": "AWS_S3_ENDPOINT",
+            "AWS_ACCESS_KEY_ID": "AWS_ACCESS_KEY_ID",
+            "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY",
+            "AWS_S3_BUCKET": "AWS_S3_BUCKET",
+            "AWS_DEFAULT_REGION": "AWS_DEFAULT_REGION",
+        },
+    )
+    # mount persistent volume...
+    kubernetes.mount_pvc(
+        push_task,
+        pvc_name="training",
+        mount_path="/data",
+    )
+
+
 # start pipeline
 if __name__ == "__main__":
     metadata = {
@@ -143,7 +174,8 @@ if __name__ == "__main__":
         "dataset_file_name": "ita_dataset.tar.gz",
         "pipeline_version": "1",
         "author_name": "DevOps Team",
-        "cluster_domain": "apps.prod.rhoai.rh-aiservices-bu.com",
+        "registry": "model-registry-rest",
+        "cluster_domain": "apps.ocp.lab",
         "model_path": "/data/model",
         "dataset_path": "/data/dataset",
         "finetuned_model_path": "/data/finetuned"
