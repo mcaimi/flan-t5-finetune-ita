@@ -13,7 +13,7 @@ def detect_accelerator() -> (str, torch.dtype):
     # detect discrete accelerator
     if torch.cuda.is_available():
         accelerator = "cuda"
-        dtype = torch.float16
+        dtype = torch.bfloat16
     else:
         accelerator = "cpu"
         dtype = torch.float32
