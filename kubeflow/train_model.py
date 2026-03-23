@@ -10,7 +10,7 @@ from kfp.dsl import (
 
 
 @component(base_image='python:3.11',
-          packages_to_install=["torch", "transformers", "datasets", "accelerate"])
+          packages_to_install=["torch", "transformers==4.57", "datasets", "accelerate"])
 def train_model(
     dataset_dir: str,
     original_model_dir: str,

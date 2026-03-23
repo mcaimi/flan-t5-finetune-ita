@@ -8,7 +8,7 @@ from kfp.dsl import (
 
 
 @component(base_image="python:3.11",
-          packages_to_install=["optimum", "transformers", "optimum[onnxruntime]"])
+          packages_to_install=["optimum", "transformers==4.57", "optimum[onnxruntime]==2.1.0"])
 def convert_model(
     checkpoint_dir: str,
     finetuned_model: Input[Model],
