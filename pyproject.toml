@@ -1,6 +1,6 @@
 [project]
 name = "flan-t5-finetuning"
-version = "0.1.0"
+version = "0.2.0"
 description = "Example Machinery to Finetune a FLAN-T5 model to recognize and anonymize PII in Italian Documents"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -19,6 +19,6 @@ dependencies = [
     "seqeval>=1.2.2",
     "torch>=2.0.0",
     "tqdm>=4.67.1",
-    "transformers>=4.30.0",
+    "transformers>=4.57",
     "wandb>=0.22.2",
 ]
