@@ -20,6 +20,15 @@ def detect_accelerator() -> (str, torch.dtype):
 
     return (accelerator, dtype)
 
+# set proxy environment variables
+def set_proxy(proxies: dict = None) -> None:
+    if proxies is None:
+        return
+    
+    # set proxy in python environment
+    os.environ["http_proxy"] = proxies.get("http", "")
+    os.environ["https_proxy"] = proxies.get("https", "")
+
 # Download model checkpoint from HuggingFace repositories
 def downloadFromHuggingFace(repo_id: str,
                             local_dir: str,
