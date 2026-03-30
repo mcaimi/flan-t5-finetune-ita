@@ -23,6 +23,7 @@ datasets_connection_secret_name = "s3-datasets"
 data_connection_secret_name = "s3-models"
 artifacts_connection_secret_name = "s3-artifacts"
 huggingface_api_secret = "huggingface-secret"
+network_settings_secret = "network-settings"
 
 
 # Create pipeline
@@ -63,6 +64,14 @@ def training_pipeline(
             "AWS_DEFAULT_REGION": "AWS_DEFAULT_REGION",
         },
     )
+    kubernetes.use_secret_as_env(
+        dataset_fetch_task,
+        secret_name=network_settings_secret,
+        secret_key_to_env={
+            "HTTP_PROXY": "HTTP_PROXY",
+            "HTTPS_PROXY": "HTTPS_PROXY",
+        },
+    )
 
     # download base model from HF
     fetch_model_task = fetch_model(
@@ -74,6 +83,14 @@ def training_pipeline(
         secret_name=huggingface_api_secret,
         secret_key_to_env={
             "HF_TOKEN": "HF_TOKEN",
+        },
+    )
+    kubernetes.use_secret_as_env(
+        fetch_model_task,
+        secret_name=network_settings_secret,
+        secret_key_to_env={
+            "HTTP_PROXY": "HTTP_PROXY",
+            "HTTPS_PROXY": "HTTPS_PROXY",
         },
     )
 
@@ -145,6 +162,14 @@ def training_pipeline(
             "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY",
             "AWS_S3_BUCKET": "AWS_S3_BUCKET",
             "AWS_DEFAULT_REGION": "AWS_DEFAULT_REGION",
+        },
+    )
+    kubernetes.use_secret_as_env(
+        push_task,
+        secret_name=network_settings_secret,
+        secret_key_to_env={
+            "HTTP_PROXY": "HTTP_PROXY",
+            "HTTPS_PROXY": "HTTPS_PROXY",
         },
     )
     # mount persistent volume...

@@ -183,6 +183,12 @@ The required secrets (and corresponding buckets on S3) are:
 - `s3-pipelines`: for storing data used by kubeflow
 - `s3-datasets`: for storing datasets
 
+3. If you are using a proxy to connect to external dependencies (s3 buckets, huggingface, etc):
+
+```bash
+$ oc create secret generic network-settings --from-literal=HTTP_PROXY="proxy address" --from-literal=HTTPS_PROXY="proxy address"
+```
+
 ## References
 
 - [FLAN-T5 Model](https://huggingface.co/google/flan-t5-small)
