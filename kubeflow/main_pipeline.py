@@ -23,7 +23,7 @@ datasets_connection_secret_name = "s3-datasets"
 data_connection_secret_name = "s3-models"
 artifacts_connection_secret_name = "s3-artifacts"
 huggingface_api_secret = "huggingface-secret"
-network_settings_secret = "network-settings"
+network_settings_cm = "network-settings"
 
 
 # Create pipeline
@@ -64,12 +64,13 @@ def training_pipeline(
             "AWS_DEFAULT_REGION": "AWS_DEFAULT_REGION",
         },
     )
-    kubernetes.use_secret_as_env(
+    kubernetes.use_config_map_as_env(
         dataset_fetch_task,
-        secret_name=network_settings_secret,
-        secret_key_to_env={
-            "HTTP_PROXY": "HTTP_PROXY",
-            "HTTPS_PROXY": "HTTPS_PROXY",
+        config_map_name=network_settings_secret,
+        config_map_key_to_env={
+            "HTTP_PROXY": "http_proxy",
+            "HTTPS_PROXY": "https_proxy",
+            "NO_PROXY": "no_proxy",
         },
     )
 
@@ -85,12 +86,13 @@ def training_pipeline(
             "HF_TOKEN": "HF_TOKEN",
         },
     )
-    kubernetes.use_secret_as_env(
+    kubernetes.use_config_map_as_env(
         fetch_model_task,
-        secret_name=network_settings_secret,
-        secret_key_to_env={
-            "HTTP_PROXY": "HTTP_PROXY",
-            "HTTPS_PROXY": "HTTPS_PROXY",
+        config_map_name=network_settings_secret,
+        config_map_key_to_env={
+            "HTTP_PROXY": "http_proxy",
+            "HTTPS_PROXY": "https_proxy",
+            "NO_PROXY": "no_proxy",
         },
     )
 
@@ -164,12 +166,13 @@ def training_pipeline(
             "AWS_DEFAULT_REGION": "AWS_DEFAULT_REGION",
         },
     )
-    kubernetes.use_secret_as_env(
+    kubernetes.use_config_map_as_env(
         push_task,
-        secret_name=network_settings_secret,
-        secret_key_to_env={
-            "HTTP_PROXY": "HTTP_PROXY",
-            "HTTPS_PROXY": "HTTPS_PROXY",
+        config_map_name=network_settings_secret,
+        config_map_key_to_env={
+            "HTTP_PROXY": "http_proxy",
+            "HTTPS_PROXY": "https_proxy",
+            "NO_PROXY": "no_proxy",
         },
     )
     # mount persistent volume...

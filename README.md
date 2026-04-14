@@ -186,7 +186,7 @@ The required secrets (and corresponding buckets on S3) are:
 3. If you are using a proxy to connect to external dependencies (s3 buckets, huggingface, etc):
 
 ```bash
-$ oc create secret generic network-settings --from-literal=HTTP_PROXY="proxy address" --from-literal=HTTPS_PROXY="proxy address"
+$ oc create configmap network-settings --from-literal=HTTP_PROXY="proxy address" --from-literal=HTTPS_PROXY="proxy address" --from-literal=NO_PROXY="localhost,127.0.0.1,.svc.cluster.local,kubernetes.default.svc,metadata-grpc-service,0,1,2,3,4,5,6,7,8,9"
 ```
 
 ## References
