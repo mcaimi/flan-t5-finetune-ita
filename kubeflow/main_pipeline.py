@@ -45,14 +45,14 @@ def training_pipeline(
     cluster_domain: str,
     dataset_path: str,
     model_path: str,
-    finetuned_model_path: str
+    finetuned_model_path: str,
 ):
 
     dataset_fetch_task = download_tar_from_s3(
-                            dataset_name=dataset_name,
-                            dataset_version=dataset_version,
-                            file_name=dataset_file_name
-                        )
+        dataset_name=dataset_name,
+        dataset_version=dataset_version,
+        file_name=dataset_file_name,
+    )
     kubernetes.use_secret_as_env(
         dataset_fetch_task,
         secret_name=datasets_connection_secret_name,
@@ -76,8 +76,9 @@ def training_pipeline(
 
     # download base model from HF
     fetch_model_task = fetch_model(
-        model_name=model_name, model_version=model_version,
-        allowed_patterns=model_allowed_patterns
+        model_name=model_name,
+        model_version=model_version,
+        allowed_patterns=model_allowed_patterns,
     )
     kubernetes.use_secret_as_env(
         fetch_model_task,
@@ -101,7 +102,7 @@ def training_pipeline(
         model_dir=model_path,
         dataset_dir=dataset_path,
         model=fetch_model_task.outputs["original_model"],
-        dataset=dataset_fetch_task.outputs["output_tar"]
+        dataset=dataset_fetch_task.outputs["output_tar"],
     )
     unzip_data_task.after(dataset_fetch_task)
     unzip_data_task.after(fetch_model_task)
@@ -114,13 +115,23 @@ def training_pipeline(
     )
 
     # Train model
-    train_model_task = train_model(dataset_dir=dataset_path,
-                                   original_model_dir=model_path,
-                                   finetuned_model_dir=finetuned_model_path,
-                                   hyperparameters=hyperparameters)
+    train_model_task = train_model(
+        dataset_dir=dataset_path,
+        original_model_dir=model_path,
+        finetuned_model_dir=finetuned_model_path,
+        hyperparameters=hyperparameters,
+    )
     train_model_task.after(unzip_data_task)
     train_model_task.set_cpu_limit("8")
     train_model_task.set_memory_limit("24G")
+    # uncomment this to use a gpu
+    # train_model_task.set_accelerator_type("nvidia.com/gpu").set_accelerator_limit("1")
+    # kubernetes.add_toleration(
+    #   train_model_task,
+    #   key="nvidia.com/gpu",
+    #   operator='Exists',
+    #   effect="NoSchedule"
+    # )
 
     # mount persistent volume...
     kubernetes.mount_pvc(
@@ -132,7 +143,7 @@ def training_pipeline(
     # convert to onnx
     convert_task = convert_model(
         checkpoint_dir=finetuned_model_path,
-        finetuned_model=train_model_task.outputs["finetuned_model"]
+        finetuned_model=train_model_task.outputs["finetuned_model"],
     )
     convert_task.after(train_model_task)
     convert_task.set_cpu_limit("8")
@@ -146,13 +157,15 @@ def training_pipeline(
     )
 
     # push to model registry
-    push_task = push_to_model_registry(model_name=model_name,
-                                       finetuned_model=train_model_task.outputs["finetuned_model"],
-                                       version=dataset_version,
-                                       registry=registry,
-                                       cluster_domain=cluster_domain,
-                                       author_name=author_name,
-                                       data_path=finetuned_model_path)
+    push_task = push_to_model_registry(
+        model_name=model_name,
+        finetuned_model=train_model_task.outputs["finetuned_model"],
+        version=dataset_version,
+        registry=registry,
+        cluster_domain=cluster_domain,
+        author_name=author_name,
+        data_path=finetuned_model_path,
+    )
     push_task.after(train_model_task)
     push_task.after(convert_task)
     kubernetes.use_secret_as_env(
@@ -192,7 +205,7 @@ if __name__ == "__main__":
             "learning_rate": 1e-4,
             "max_length": 256,
             "optimizer": "AdamW",
-            "train_val_split": 0.8
+            "train_val_split": 0.8,
         },
         "model_name": "google/flan-t5-small",
         "model_version": "main",
@@ -206,7 +219,7 @@ if __name__ == "__main__":
         "cluster_domain": "apps.ocp.lab",
         "model_path": "/data/model",
         "dataset_path": "/data/dataset",
-        "finetuned_model_path": "/data/finetuned"
+        "finetuned_model_path": "/data/finetuned",
     }
 
     namespace_file_path = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
@@ -237,4 +250,3 @@ if __name__ == "__main__":
         experiment_name="flan-t5-anon-ita-finetune-pipeline",
         enable_caching=True,
     )
-
