@@ -2,7 +2,7 @@
 import kfp
 
 # Import objects from the DSL library
-from kfp.dsl import pipeline
+from kfp.dsl import pipeline, If
 from kfp import kubernetes
 
 # compile pipeline for debugging
@@ -46,6 +46,7 @@ def training_pipeline(
     dataset_path: str,
     model_path: str,
     finetuned_model_path: str,
+    save_to_registry: int,
 ):
 
     dataset_fetch_task = download_tar_from_s3(
@@ -97,6 +98,14 @@ def training_pipeline(
         },
     )
 
+    # prepare data on persistent storage for training
+    #data_disk = kubernetes.CreatePVC(
+    #    pvc_name_suffix="-training-pvc",
+    #    access_modes=['ReadWriteOnce'],
+    #    size='50Gi',
+    #    storage_class_name='gp3-csi',
+    #)
+
     # unzip model to persistent storage
     unzip_data_task = unzip_data(
         model_dir=model_path,
@@ -110,7 +119,7 @@ def training_pipeline(
     # mount persistent volume...
     kubernetes.mount_pvc(
         unzip_data_task,
-        pvc_name="training",
+        pvc_name="training", # data_disk.outputs["name"]
         mount_path="/data",
     )
 
@@ -157,43 +166,49 @@ def training_pipeline(
     )
 
     # push to model registry
-    push_task = push_to_model_registry(
-        model_name=model_name,
-        finetuned_model=train_model_task.outputs["finetuned_model"],
-        version=dataset_version,
-        registry=registry,
-        cluster_domain=cluster_domain,
-        author_name=author_name,
-        data_path=finetuned_model_path,
-    )
-    push_task.after(train_model_task)
-    push_task.after(convert_task)
-    kubernetes.use_secret_as_env(
-        push_task,
-        secret_name=data_connection_secret_name,
-        secret_key_to_env={
-            "AWS_S3_ENDPOINT": "AWS_S3_ENDPOINT",
-            "AWS_ACCESS_KEY_ID": "AWS_ACCESS_KEY_ID",
-            "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY",
-            "AWS_S3_BUCKET": "AWS_S3_BUCKET",
-            "AWS_DEFAULT_REGION": "AWS_DEFAULT_REGION",
-        },
-    )
-    kubernetes.use_config_map_as_env(
-        push_task,
-        config_map_name=network_settings_secret,
-        config_map_key_to_env={
-            "HTTP_PROXY": "http_proxy",
-            "HTTPS_PROXY": "https_proxy",
-            "NO_PROXY": "no_proxy",
-        },
-    )
-    # mount persistent volume...
-    kubernetes.mount_pvc(
-        push_task,
-        pvc_name="training",
-        mount_path="/data",
-    )
+    with If(save_to_registry == 1):
+        push_task = push_to_model_registry(
+            model_name=model_name,
+            finetuned_model=train_model_task.outputs["finetuned_model"],
+            version=dataset_version,
+            registry=registry,
+            cluster_domain=cluster_domain,
+            author_name=author_name,
+            data_path=finetuned_model_path,
+        )
+        push_task.after(train_model_task)
+        push_task.after(convert_task)
+        kubernetes.use_secret_as_env(
+            push_task,
+            secret_name=data_connection_secret_name,
+            secret_key_to_env={
+                "AWS_S3_ENDPOINT": "AWS_S3_ENDPOINT",
+                "AWS_ACCESS_KEY_ID": "AWS_ACCESS_KEY_ID",
+                "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY",
+                "AWS_S3_BUCKET": "AWS_S3_BUCKET",
+                "AWS_DEFAULT_REGION": "AWS_DEFAULT_REGION",
+            },
+        )
+        kubernetes.use_config_map_as_env(
+            push_task,
+            config_map_name=network_settings_secret,
+            config_map_key_to_env={
+                "HTTP_PROXY": "http_proxy",
+                "HTTPS_PROXY": "https_proxy",
+                "NO_PROXY": "no_proxy",
+            },
+        )
+        # mount persistent volume...
+        kubernetes.mount_pvc(
+            push_task,
+            pvc_name="training",
+            mount_path="/data",
+        )
+
+    # remove pvc after pipeline completes
+    #delete_datadisk = kubernetes.DeletePVC(
+    #    pvc_name=data_disk.outputs['name']
+    #).after(push_task)
 
 
 # start pipeline
@@ -220,6 +235,7 @@ if __name__ == "__main__":
         "model_path": "/data/model",
         "dataset_path": "/data/dataset",
         "finetuned_model_path": "/data/finetuned",
+        "save_to_registry": 0,
     }
 
     namespace_file_path = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
