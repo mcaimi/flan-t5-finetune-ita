@@ -19,6 +19,7 @@ This project provides a complete Jupyter notebook for fine-tuning Google's FLAN-
 - ✅ ONNX Conversion Notebook and Inference Test
 - ✅ Example Kubeflow Pipeline for training
 - ✅ GPU support (automatically detected)
+- ✅ MLFlow integration for experiment tracking
 
 ## PII Types Supported
 
@@ -145,12 +146,6 @@ You need to create these secrets in the Kubernetes Project you run all experimen
 $ oc create secret generic huggingface-secret --from-literal=HF_TOKEN=hf_api_token --from-literal=HF_HOME=hf_home_path
 ```
 
-2. A secret holding the API Token to interface with Weights and Biases (optional)
-
-```bash
-$ oc create secret generic wandb-secret --from-literal=WB_APITOKEN=wandb-token --from-literal=WB_PROJECTNAME=project-name
-```
-
 Additionally, on OCP AI you need to create connections for interacting with S3 Storage Buckets. For example, for the `s3-artifacts` connection you need to deploy a manifest like this:
 
 ```yaml
@@ -183,10 +178,16 @@ The required secrets (and corresponding buckets on S3) are:
 - `s3-pipelines`: for storing data used by kubeflow
 - `s3-datasets`: for storing datasets
 
-3. If you are using a proxy to connect to external dependencies (s3 buckets, huggingface, etc):
+2. If you are using a proxy to connect to external dependencies (s3 buckets, huggingface, etc):
 
 ```bash
 $ oc create configmap network-settings --from-literal=HTTP_PROXY="proxy address" --from-literal=HTTPS_PROXY="proxy address" --from-literal=NO_PROXY="localhost,127.0.0.1,.svc.cluster.local,kubernetes.default.svc,metadata-grpc-service,0,1,2,3,4,5,6,7,8,9"
+```
+
+3. Depending on which notebook image you use, you might want to add this line to the beginning of Jupyter Notebooks
+
+```python
+!pip install -q numpy transformers==4.57.3 python-dotenv torch datasets accelerate mlflow mlflow[kubernetes]
 ```
 
 ## References
