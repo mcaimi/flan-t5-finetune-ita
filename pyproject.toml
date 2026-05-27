@@ -11,6 +11,7 @@ dependencies = [
     "evaluate>=0.4.0",
     "huggingface-hub>=0.35.3",
     "jupyter>=1.0.0",
+    "mlflow[kubernetes]>=3.12.0",
     "notebook>=6.5.0",
     "onnxruntime>=1.23.1",
     "optimum[onnxruntime]>=2.0.0",
@@ -20,5 +21,4 @@ dependencies = [
     "torch>=2.0.0",
     "tqdm>=4.67.1",
     "transformers>=4.57",
-    "wandb>=0.22.2",
 ]
