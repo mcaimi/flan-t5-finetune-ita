@@ -3,6 +3,6 @@ huggingface:
   local_dir: "/tmp/cache/huggingface/local_repo"
   cache_dir: "/tmp/cache/huggingface"
 
-wandb:
-  apitoken: "your_api_token"
-  project: "wandb_project_name"
+mlflow:
+  endpoint: "http://localhost:5001"
+  experiment: "flan-t5-finetune-ita"
