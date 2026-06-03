@@ -14,6 +14,9 @@ def detect_accelerator() -> (str, torch.dtype):
     if torch.cuda.is_available():
         accelerator = "cuda"
         dtype = torch.bfloat16
+    elif torch.backends.mps.is_available():
+        accelerator = "mps"
+        dtype = torch.float32
     else:
         accelerator = "cpu"
         dtype = torch.float32
