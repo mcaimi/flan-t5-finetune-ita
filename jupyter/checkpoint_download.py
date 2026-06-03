@@ -3,8 +3,8 @@
 # Download Google FLAN-T5 checkpoint from HuggingFace
 
 try:
+    import os
     import dotenv
-    import huggingface_hub as hf
     from libs.utility import set_proxy, downloadFromHuggingFace
     from libs.parameters import Properties
 except ImportError as e:
@@ -23,7 +23,9 @@ PROXIES: dict = {
 # setup proxy
 set_proxy(proxies=PROXIES)
 
-print(f"Using proxy: HTTP={os.environ.get('HTTP_PROXY')} or HTTPS={os.environ.get('HTTPS_PROXY')}")
+print(
+    f"Using proxy: HTTP={os.environ.get('HTTP_PROXY')} or HTTPS={os.environ.get('HTTPS_PROXY')}"
+)
 
 model_path = downloadFromHuggingFace(
     repo_id="google/flan-t5-small",

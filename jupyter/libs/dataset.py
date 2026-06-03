@@ -76,7 +76,10 @@ class DataPreprocessor():
         )
         
         # Replace padding token id in labels with -100 (ignored by loss)
-        label_ids = [tok if tok != self.tokenizer.pad_token_id else -100 for tok in labels.get('input_ids')]
+        label_ids = [
+            [-100 if tok == self.tokenizer.pad_token_id else tok for tok in seq]
+            for seq in labels['input_ids']
+        ]
 
         model_inputs["labels"] = label_ids
   
@@ -91,10 +94,9 @@ def anonymize_text(text, model, tokenizer, max_length: int = 512, truncation: bo
     input_text = f"anonymize: {text}"
     inputs = tokenizer(input_text, return_tensors="pt", max_length=max_length, truncation=truncation)
     
-    # Move to device if using GPU
-    if torch.cuda.is_available():
-        inputs = {k: v.to("cuda") for k, v in inputs.items()}
-        model = model.to("cuda")
+    # Move inputs to the same device as the model
+    device = next(model.parameters()).device
+    inputs = {k: v.to(device) for k, v in inputs.items()}
     
     # Generate prediction
     with torch.no_grad():
