@@ -20,6 +20,8 @@ def train_model(
 ):
     try:
         import os
+        import re
+        import numpy as np
         import random
         import torch
         import json
@@ -32,7 +34,9 @@ def train_model(
             AutoModelForSeq2SeqLM, # main seq2seq model
             Seq2SeqTrainingArguments,
             Seq2SeqTrainer,
-            DataCollatorForSeq2Seq # dataset collator
+            DataCollatorForSeq2Seq, # dataset collator
+            EarlyStoppingCallback,
+            set_seed,
         )
         from datasets import load_dataset, Dataset, DatasetDict
     except ImportError as e:
@@ -124,10 +128,46 @@ def train_model(
             model_inputs["labels"] = labels["input_ids"]
             return model_inputs
 
+    # compute custom metrics
+    def compute_metrics(eval_preds):
+        preds, labels = eval_preds
+
+        preds = np.where(preds != -100, preds, tokenizer.pad_token_id)
+        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
+        decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
+        decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
+
+        decoded_preds = [p.strip() for p in decoded_preds]
+        decoded_labels = [l.strip() for l in decoded_labels]
+
+        exact_matches = sum(p == l for p, l in zip(decoded_preds, decoded_labels))
+        exact_match_acc = exact_matches / len(decoded_labels)
+
+        pii_pattern = r'\[[A-Z_]+\]'
+        tp, fp, fn = 0, 0, 0
+        for pred, label in zip(decoded_preds, decoded_labels):
+            pred_entities = set(re.findall(pii_pattern, pred))
+            label_entities = set(re.findall(pii_pattern, label))
+            tp += len(pred_entities & label_entities)
+            fp += len(pred_entities - label_entities)
+            fn += len(label_entities - pred_entities)
+
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+
+        return {
+            "exact_match": exact_match_acc,
+            "pii_precision": precision,
+            "pii_recall": recall,
+            "pii_f1": f1,
+        }
+
     # detect the presence of an accelerator available for this task
     device, dtype = detect_accelerator()
 
     # parameters
+    SEED: int = hyperparameters.get("seed", 42)
     EPOCHS: int = hyperparameters.get("epochs", 1)
     LEARNING_RATE: float = float(hyperparameters.get("learning_rate", 1e-4))
     HAS_GPU: bool = (device == "cuda")
@@ -136,6 +176,9 @@ def train_model(
     BATCH_SIZE: int = int(hyperparameters.get("batch_size", 4))
     TRAIN_VAL_SPLIT: float = float(hyperparameters.get("train_val_split", 0.8))
     RUN_NAME: str = f"flan-t5-it-finetune_{uuid.uuid4()}"
+
+    # set seed
+    set_seed(SEED)
 
     # load dataset from disk...
     it_pii_dataset: CustomPIIDataset = CustomPIIDataset(dataset_dir)
@@ -170,7 +213,14 @@ def train_model(
 
     # Load tokenizer and model
     tokenizer = AutoTokenizer.from_pretrained(original_model_dir)
+    # register PII placeholder tokens
+    pii_tokens = ["[NOME]", "[INDIRIZZO]", "[TELEFONO]", "[EMAIL]",
+                  "[CARTA_CREDITO]", "[CODICE_FISCALE]", "[DATA_NASCITA]"]
+    num_added = tokenizer.add_tokens(pii_tokens)
+    print(f"Added {num_added} special PII tokens to tokenizer")
     model = AutoModelForSeq2SeqLM.from_pretrained(original_model_dir).to(device)
+    # resize model token embeddings
+    model.resize_token_embeddings(len(tokenizer))
 
     print(f"Model loaded: {original_model_dir} on {device}")
     print(f"Model parameters: {model.num_parameters()}")
@@ -203,9 +253,12 @@ def train_model(
         per_device_eval_batch_size=BATCH_SIZE,
         num_train_epochs=EPOCHS,  # More epochs for small dataset
         weight_decay=0.01,
+        warmup_ratio=0.1,
+        lr_scheduler_type="cosine",
+        #gradient_accumulation_steps=4,
         save_total_limit=2,
         predict_with_generate=True,
-        fp16=HAS_GPU,  # Use mixed precision if GPU available
+        bf16=HAS_GPU,  # Use mixed precision if GPU available
         dataloader_pin_memory=HAS_GPU, # only on GPU equipped systems. also silences warnings on MPS devices (Apple)
         logging_steps=10,
         save_strategy="epoch",
@@ -214,6 +267,7 @@ def train_model(
         greater_is_better=False,
         push_to_hub=False,
         report_to="none", run_name=RUN_NAME,
+        seed=SEED,
     )
 
     # Data collator:
@@ -232,7 +286,9 @@ def train_model(
         train_dataset=tokenized_datasets["train"],
         eval_dataset=tokenized_datasets["validation"],
         processing_class=tokenizer,
-        data_collator=data_collator
+        data_collator=data_collator,
+        compute_metrics=compute_metrics,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)],
     )
 
     print("Trainer initialized successfully!")

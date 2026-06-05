@@ -217,10 +217,11 @@ if __name__ == "__main__":
         "hyperparameters": {
             "epochs": 1,
             "batch_size": 4,
-            "learning_rate": 1e-4,
+            "learning_rate": 5e-5,
             "max_length": 256,
             "optimizer": "AdamW",
             "train_val_split": 0.8,
+            "seed": 42,
         },
         "model_name": "google/flan-t5-small",
         "model_version": "main",
