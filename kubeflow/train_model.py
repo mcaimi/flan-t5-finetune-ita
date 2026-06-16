@@ -10,7 +10,7 @@ from kfp.dsl import (
 
 
 @component(base_image='python:3.11',
-          packages_to_install=["torch", "transformers==4.57", "datasets", "accelerate"])
+          packages_to_install=["torch", "transformers==4.57", "datasets", "accelerate", "mlflow"])
 def train_model(
     dataset_dir: str,
     original_model_dir: str,
@@ -39,8 +39,12 @@ def train_model(
             set_seed,
         )
         from datasets import load_dataset, Dataset, DatasetDict
+
+        # metrics
+        import mlflow
     except ImportError as e:
         print(f"Import error: {e}")
+        raise
 
     # create output dir
     os.makedirs(finetuned_model_dir, exist_ok=True)
@@ -175,10 +179,23 @@ def train_model(
     OPTIMIZER: str = hyperparameters.get("optimizer", "AdamW")
     BATCH_SIZE: int = int(hyperparameters.get("batch_size", 4))
     TRAIN_VAL_SPLIT: float = float(hyperparameters.get("train_val_split", 0.8))
-    RUN_NAME: str = f"flan-t5-it-finetune_{uuid.uuid4()}"
+
+    # MLFlow parameters
+    MLFLOW_TRACKING_URI: str = hyperparameters.get("mlflow_tracking_uri", "")
+    MLFLOW_EXPERIMENT: str = hyperparameters.get("mlflow_experiment", "flan-t5-finetuning")
+    RUN_NAME: str = f"{MLFLOW_EXPERIMENT}_{uuid.uuid4()}"
 
     # set seed
     set_seed(SEED)
+
+    # setup MLFlow
+    if MLFLOW_TRACKING_URI:
+        try:
+            mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+            mlflow.set_experiment(MLFLOW_EXPERIMENT)
+            print(f"MLFlow configured: {MLFLOW_TRACKING_URI} - Experiment: {MLFLOW_EXPERIMENT}")
+        except Exception as e:
+            print(f"MLFlow Setup Failed: {e}")
 
     # load dataset from disk...
     it_pii_dataset: CustomPIIDataset = CustomPIIDataset(dataset_dir)
@@ -266,7 +283,8 @@ def train_model(
         metric_for_best_model="eval_loss",
         greater_is_better=False,
         push_to_hub=False,
-        report_to="none", run_name=RUN_NAME,
+        report_to="mlflow" if MLFLOW_TRACKING_URI else "none",
+        run_name=RUN_NAME,
         seed=SEED,
     )
 
@@ -295,7 +313,11 @@ def train_model(
 
     ## TRAIN MODEL!
     print("Starting training...")
-    train_result = trainer.train()
+    if MLFLOW_TRACKING_URI:
+        with mlflow.start_run():
+            train_result = trainer.train()
+    else:
+        train_result = trainer.train()
 
     # report information
     print("\nTraining completed!")
@@ -313,6 +335,10 @@ def train_model(
     ## SAVE MODEL
     model.save_pretrained(finetuned_model_dir)
     tokenizer.save_pretrained(finetuned_model_dir)
+
+    # end mlflow run
+    if MLFLOW_TRACKING_URI:
+        mlflow.end_run()
 
     # save finetuned model to S3
     finetuned_model._set_path(finetuned_model.path + ".zip")

@@ -222,6 +222,8 @@ if __name__ == "__main__":
             "optimizer": "AdamW",
             "train_val_split": 0.8,
             "seed": 42,
+            "mlflow_experiment": "flan-t5-finetune-pipeline",
+            "mlflow_tracking_uri": "",
         },
         "model_name": "google/flan-t5-small",
         "model_version": "main",
